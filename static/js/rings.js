@@ -19,19 +19,8 @@ var SETTINGS = {
     }
 };
 
-var canvas  = document.getElementById('rings'),
-    context = canvas.getContext('2d'),
-    rings   = [];
 
-var bgGradient = context.createRadialGradient(
-    SETTINGS.CANVAS.WIDTH / 2, 0, SETTINGS.CANVAS.WIDTH / 2,
-    SETTINGS.CANVAS.WIDTH / 2, 0, 0
-);
-bgGradient.addColorStop(.0, SETTINGS.CANVAS.BACKGROUND.INNER);
-bgGradient.addColorStop(.9, SETTINGS.CANVAS.BACKGROUND.OUTER);
-
-
-var Vector3d = function (x, y, z) {
+function Vector3d(x, y, z) {
     this.x = x || 0;
     this.y = y || 0;
     this.z = z || 0;
@@ -46,7 +35,7 @@ Vector3d.prototype = {
 };
 
 
-var Node = function (position, velocity, size, width, color) {
+function Node(position, velocity, size, width, color) {
     this.position = position || new Vector3d();
     this.velocity = velocity || new Vector3d();
     this.size     = size     || 1;
@@ -61,78 +50,94 @@ Node.prototype = {
 };
 
 
-function createRandomNode() {
-    var position = new Vector3d(Math.random() * canvas.width, Math.random() * canvas.height + canvas.height, Math.random() * SETTINGS.RINGS.DEPTH.MAX + 1),
-        velocity = new Vector3d(0, -(SETTINGS.RINGS.VELOCITY / position.z), 0),
-        size     = SETTINGS.RINGS.RADIUS / position.z,
-        width    = size * .4,
-        color    = SETTINGS.RINGS.COLORS[Math.floor(Math.random() * SETTINGS.RINGS.COLORS.length)];
-
-    return new Node(position, velocity, size, width, color);
+var Manager = function () {
+        this.initialize();
 }
 
+Manager.prototype = {
+    canvas     : document.getElementById('rings'),
+    context    : this.canvas.getContext('2d'),
+    rings      : [],
+    background : null,
 
-function clear() {
-    context.clearRect(0, 0, canvas.width, canvas.height);
-    context.globalCompositeOperation = 'lighter';
-    context.fillStyle = bgGradient;
-    context.fillRect(0, 0, canvas.width, canvas.height);
-}
+    initialize: function () {
+        window.requestAnimationFrame = window.requestAnimationFrame       ||
+                                       window.webkitRequestAnimationFrame ||
+                                       window.mozRequestAnimationFrame    ||
+                                       window.msRequestAnimationFrame     ||
+                                       window.oRequestAnimationFrame      ||
+                                       function(callback) {
+                                           window.setTimeout(callback, 1000 / 60);
+                                       };
 
+        this.canvas.width            = SETTINGS.CANVAS.WIDTH;
+        this.canvas.height           = SETTINGS.CANVAS.HEIGHT;
+        this.canvas.style.background = SETTINGS.CANVAS.BACKGROUND;
 
-function drawAndUpdate() {
-    for (var i = 0; i < rings.length; i++) {
-        var ring = rings[i];
+        window.addEventListener('resize', function() {
+            this.canvas.width  = width  = window.innerWidth;
+            this.canvas.height = height = window.innerHeight;
+        });
 
-        context.beginPath();
+        this.background = this.context.createRadialGradient(
+            SETTINGS.CANVAS.WIDTH / 2, 0, SETTINGS.CANVAS.WIDTH / 2,
+            SETTINGS.CANVAS.WIDTH / 2, 0, 0
+        );
+        this.background.addColorStop(.0, SETTINGS.CANVAS.BACKGROUND.INNER);
+        this.background.addColorStop(.9, SETTINGS.CANVAS.BACKGROUND.OUTER);
 
-        context.strokeStyle = ring.color;
-        context.lineWidth   = ring.width;
+        for (var i = 0; i < SETTINGS.RINGS.COUNT; i++) {
+            this.rings.push(this.createRandomNode());
+        }
+    },
 
-        context.arc(ring.position.x, ring.position.y, ring.size, 0, 2 * Math.PI, true);
-        context.stroke();
+    createRandomNode: function () {
+        var position = new Vector3d(Math.random() * this.canvas.width, Math.random() * this.canvas.height + this.canvas.height, Math.random() * SETTINGS.RINGS.DEPTH.MAX + 1),
+            velocity = new Vector3d(0, -(SETTINGS.RINGS.VELOCITY / position.z), 0),
+            size     = SETTINGS.RINGS.RADIUS / position.z,
+            width    = size * .4,
+            color    = SETTINGS.RINGS.COLORS[Math.floor(Math.random() * SETTINGS.RINGS.COLORS.length)];
 
-        context.closePath();
+        return new Node(position, velocity, size, width, color);
+    },
 
-        ring.move();
+    clear: function () {
+        this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        this.context.globalCompositeOperation = 'lighter';
+        this.context.fillStyle = this.background;
+        this.context.fillRect(0, 0, this.canvas.width, this.canvas.height);
+    },
 
-        if (ring.position.y < 0 - ring.size - ring.width)
-            rings[i] = createRandomNode();
+    drawAndUpdate: function () {
+        for (var i = 0; i < this.rings.length; i++) {
+            var ring = this.rings[i];
+
+            this.context.beginPath();
+
+            this.context.strokeStyle = ring.color;
+            this.context.lineWidth   = ring.width;
+
+            this.context.arc(ring.position.x, ring.position.y, ring.size, 0, 2 * Math.PI, true);
+            this.context.stroke();
+
+            this.context.closePath();
+
+            ring.move();
+
+            if (ring.position.y < 0 - ring.size - ring.width) {
+                this.rings[i] = this.createRandomNode();
+            }
+        }
+    },
+
+    loop: function () {
+        this.clear();
+        
+        this.drawAndUpdate();
+
+        window.requestAnimationFrame(this.loop, null);
     }
-}
+};
 
-
-function queue(callback) {
-    window.requestAnimationFrame(callback, null);
-}
-
-
-(function initialize() {
-    window.requestAnimationFrame = window.requestAnimationFrame       ||
-                                   window.webkitRequestAnimationFrame ||
-                                   window.mozRequestAnimationFrame    ||
-                                   window.msRequestAnimationFrame     ||
-                                   window.oRequestAnimationFrame      ||
-                                   function(callback) {
-                                       window.setTimeout(callback, 1000 / 60);
-                                   };
-
-    canvas.width            = SETTINGS.CANVAS.WIDTH;
-    canvas.height           = SETTINGS.CANVAS.HEIGHT;
-    canvas.style.background = SETTINGS.CANVAS.BACKGROUND;
-
-    window.addEventListener('resize', function() {
-        canvas.width  = width  = window.innerWidth;
-        canvas.height = height = window.innerHeight;
-    });
-
-    for (var i = 0; i < SETTINGS.RINGS.COUNT; i++)
-        rings.push(createRandomNode());
-})();
-
-
-(function loop() {
-    clear();
-    drawAndUpdate();
-    queue(loop);
-})();
+var manager = new Manager();
+manager.loop();
